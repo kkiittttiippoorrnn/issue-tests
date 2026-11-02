@@ -1,0 +1,13 @@
+# ข้อมูลบริษัท / ผลเทสจริง — เก็บในเครื่องเท่านั้น
+issues/*
+!issues/_template/
+claude-skill/test-issue/local.md
+
+# Robot output
+**/evidence/
+output.xml
+log.html
+report.html
+__pycache__/
+*.pyc
+local.ps1

@@ -1,0 +1,8 @@
+# ใช้เมื่อไม่มี AUTOMATION_HOME ที่มี venv อยู่แล้ว:
+#   python -m venv .venv
+#   .venv\Scripts\pip install -r requirements.txt
+robotframework>=7.0,<8.0
+rpaframework-windows>=11.0.0,<12.0.0
+python-dotenv>=1.0.0,<2.0.0
+# DB check (เปลี่ยน driver ตาม DB ขององค์กร)
+pyodbc>=5.0.0,<6.0.0
