@@ -14,6 +14,9 @@
    - ยังไม่มี → `python -m venv .venv` + `.venv\Scripts\pip install -r requirements.txt` แล้วเขียน keyword พื้นฐาน (launch / login / ปิดแอป) ใน `resources\keywords\`
 4. ตั้ง locator dialog error ของแอปใน `resources\locators\app_screens.resource` (`${APP.ERROR_DIALOG}`)
 5. ทดสอบโครง: คัดลอก `issues\_template` เป็น `issues\0000` แล้ว `.\run.ps1 -Issue 0000 -DryRun` ต้องผ่าน 1 test
+   (ทดสอบแม่แบบรายงาน: `python -X utf8 issues\0000\make_report.py` ต้องได้ TestResult_0000.html)
+5.1 แอปต้องรันแบบ Admin แต่ terminal ของ Claude ไม่ใช่ → รัน `tools\admin-runner\setup_task.ps1` แบบ Admin ครั้งเดียว
+5.2 อ่านหัวข้อ "รูปแบบผลงาน" ใน SKILL.md — รูปแบบ TC/รายงานของทีม ปรับให้ตรงทีมได้
 6. ลองใช้จริง: `/test-issue <ID> manual` ก่อน (ไม่ต้องมี locator) แล้วค่อยใช้โหมด default
 
 ## ปรับเชิงลึก

@@ -11,3 +11,10 @@ report.html
 __pycache__/
 *.pyc
 local.ps1
+
+# admin runner (งาน/ผลที่กำลังรัน + path python ของเครื่อง)
+tools/admin-runner/job*.json
+tools/admin-runner/job_*.txt
+tools/admin-runner/python_path.txt
+tools/admin-runner/setup_result.txt
+tools/admin-runner/extra_roots.txt

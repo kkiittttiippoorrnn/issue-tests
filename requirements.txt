@@ -6,3 +6,6 @@ rpaframework-windows>=11.0.0,<12.0.0
 python-dotenv>=1.0.0,<2.0.0
 # DB check (เปลี่ยน driver ตาม DB ขององค์กร)
 pyodbc>=5.0.0,<6.0.0
+# tools/ui_step.py (FlaUI/UIA3) + รูปหลักฐาน/รายงาน (libraries/HlMark.py, make_report.py)
+robotframework-flaui>=3.0.0,<4.0.0
+Pillow>=10.0.0
