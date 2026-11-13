@@ -1,11 +1,11 @@
 ---
 name: test-issue
-description: ทดสอบ issue แบบครบวงจรสำหรับ Tester (Azure DevOps หรือ Jira) — อ่าน issue/Test Scenario → หา build ที่มี fix → เตรียม/mock DB (ขออนุญาต) → แปลง TC เป็น Robot Framework test แล้วรันเอง → ตรวจหน้าจอ+DB → สรุป Pass/Fail + rollback. ใช้เมื่อ "/test-issue <ID>", "เทส issue นี้ให้", "ทดสอบตาม test scenario"
+description: ทดสอบ issue แบบครบวงจรสำหรับ Tester (Azure DevOps หรือ Jira) — อ่าน issue/Test Scenario → หา build ที่มี fix → เตรียม/mock DB (ขออนุญาต) → คุม UI ด้วย FlaUI + Robot Framework แล้วรันเอง → ตรวจหน้าจอ+DB → สรุป Pass/Fail + rollback. ใช้เมื่อ "/test-issue <ID>", "เทส issue นี้ให้", "ทดสอบตาม test scenario"
 args: "<IssueID> [manual]"
-version: "1.1"
+version: "1.3"
 ---
 
-> **test-issue เวอร์ชัน 1.1** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
+> **test-issue เวอร์ชัน 1.3** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
 
 เมื่อ user เรียก `/test-issue <ID> [manual]` ทำตามขั้นตอนนี้ **ทีละ phase** ตอบเป็นภาษาของ user
 
@@ -77,18 +77,28 @@ version: "1.1"
 
 ## Phase 3 — ทดสอบ
 
-### 3A. โหมด default — Robot Framework
+### 3A. โหมด default — FlaUI (UIA3) + Robot Framework
+
+**เครื่องมือหลักในการคุม UI = FlaUI (UIA3)** ผ่านสคริปต์ Python ตัวช่วยใน {FLAUI_HELPERS} / `tools\` (เรียกจาก `.robot` ด้วย `Run Process`) หรือ library `FlaUILibrary` ของ robotframework-flaui
+- ห้ามเปลี่ยนไปใช้วิธีอื่น (RPA.Windows, pywinauto, MCP คุมหน้าจอ, ให้ user กด/แคปจอ) เพียงเพราะ FlaUI ติดปัญหา — แก้ที่ตัวช่วย FlaUI ก่อน · โหมด manual ใช้เมื่อ user สั่งเท่านั้น
+- หา locator จาก **แผนที่หน้าจอ {SCREEN_MAP} / UI tree ที่ export ไว้แล้ว** ก่อนเสมอ — dump สดด้วย FlaUI เฉพาะจุดที่ยังไม่รู้ (ดูลำดับ Locator ด้านล่าง)
+- ทำตามหัวข้อ **"ประสิทธิภาพและเวลา"** ด้านล่างทุกครั้งที่เขียน/แก้ตัวช่วยหรือ `.robot`
 
 repo นี้ (`issue-tests`) มีแค่ส่วนของ issue; keyword พื้นฐานของแอป (launch, login, เมนูหลัก) อยู่ที่ {AUTOMATION_HOME} (อ้างใน .robot ด้วย `${AUTOMATION_HOME}`, repo นี้ด้วย `${ISSUE_TESTS}`) — **ห้ามเขียนไฟล์ issue ลง {AUTOMATION_HOME}**
 อ่าน README ของทั้งสองที่ + รายการ keyword ใน {BASE_KEYWORDS} ก่อนเขียน
 
 1. **ใช้ keyword ที่มีอยู่ก่อน** ({BASE_KEYWORDS} + `resources\keywords\issue_common.resource`) — เขียนใหม่เฉพาะที่ขาด
-2. **Locator** (ลำดับความน่าเชื่อถือ):
-   1. id ของ control จาก source ({UI_SOURCE_GLOB})
-   2. UI tree ที่ user export จาก {UI_INSPECTOR}
-   3. ตำแหน่ง (`path:`) — ใช้เมื่อจำเป็นเท่านั้น + comment ว่าเปราะ
+2. **Locator** — ใช้ของที่มีอยู่ก่อน dump สด (เร็วกว่า + ได้ค่าเดิมทุกรอบ):
+   1. **แผนที่หน้าจอ {SCREEN_MAP}** + **UI tree ที่ export ไว้แล้ว** จาก {UI_INSPECTOR} — อ่านไฟล์ก่อนเปิดหน้าจอเสมอ
+   2. AutomationId ของ control จาก source ({UI_SOURCE_GLOB}) — เมื่อแผนที่ยังไม่มีหน้านั้น
+   3. **dump สดด้วย FlaUI เฉพาะจุดที่ยังไม่รู้** หรือ locator จากแผนที่หาไม่เจอ (build ใหม่เปลี่ยนหน้าจอ)
+      - dump เฉพาะหน้าต่าง/element นั้น จำกัดความลึก — ห้าม dump ทั้งแอปหรือ dump หน้าที่แผนที่มีอยู่แล้ว
+      - **บันทึกผลลง {SCREEN_MAP} ทันที** (ทางเข้า, id, ControlType+Name, ข้อควรระวัง) — เก็บเฉพาะของที่ใช้ซ้ำได้ ไม่เก็บข้อมูลเฉพาะ issue
+   4. ให้ user export จาก {UI_INSPECTOR} — เมื่อ dump แล้วยังไม่ได้ (เช่น popup ที่หายเร็ว) บอกชัดว่าหน้าจอไหน จังหวะไหน
+   5. พิกัดภายในหน้าต่าง — ทางสุดท้าย + comment ว่าเปราะ (ขึ้นกับความละเอียดจอ)
+   - element ที่ไม่มี id ใช้ ControlType + Name (ตามภาษาบนจอ) · ลิงก์ (LinkLabel) ให้คลิกที่ Hyperlink ลูก ไม่ใช่กลางกรอบ Text
+   - การอ่าน**ค่า**บนจอระหว่างเทส (ข้อความใน dialog, ค่าในช่อง, รายการใน grid) ยังอ่านสดตามปกติ — ไม่นับเป็นการ dump
    - ทำตามข้อจำกัด UI ใน `local.md` (เช่นภาษาที่แสดงบนจอ)
-   - หา locator ไม่ได้ → หยุด ขอให้ user export UI tree ของหน้าจอนั้น (บอกชัดว่าหน้าจอไหน จังหวะไหน)
 3. ไฟล์ที่สร้าง — คัดลอก `issues\_template\` เป็น `issues\<ID>\` แล้วแก้:
    - `issue.robot` — 1 test ต่อ TC, ชื่อ `ISSUE-<ID>-TC<n> - <คำอธิบาย>`, tag `issue-<ID>` + `TC<n>`
    - `notes.md` — build / DB / mock (ค่าเดิม → ใหม่) / ผล / ข้อสังเกต (อัปเดตตลอดทาง)
@@ -185,10 +195,45 @@ Step
 - DB ทดสอบไม่ต้องสร้างตาราง backup (zz_*) — จดค่าเดิมแบบตายตัวใน `rollback.sql` แทน (ยังต้องขออนุญาตก่อนแก้)
 - การกดบันทึกในหน้าตั้งค่าของแอปอาจแก้ DB เกินค่าที่ติ๊ก (ลบ/สร้างแถวใหม่) → snapshot ตาราง option ก่อน-หลังด้วย diff แล้วเพิ่มลง rollback
 
+## ประสิทธิภาพและเวลา (บังคับ — ใช้กับการเทสสดและ automate)
+
+เป้าหมาย: แต่ละขั้นของ UI ใช้เวลาเป็น "ส่วนของวินาที" ไม่ใช่หลายวินาที · test เดียวเกิน ~60 วิ ต้องหาสาเหตุก่อนส่งงาน
+
+**หาหน้าต่าง / element**
+- locator มาจากแผนที่หน้าจอ / export ที่มีอยู่ก่อน — dump สดเฉพาะจุดที่ไม่รู้แล้วบันทึกลงแผนที่ (ลำดับ Locator ใน 3A)
+- หาหน้าต่างของแอปด้วย `EnumWindows` + `FromHandle` (≈0.05 วิ) — **ห้าม** `Desktop.FindAllChildren()` (2–3 วิ/ครั้ง)
+- ระบุหน้าต่างก่อนค้น element (id ซ้ำข้ามหน้าต่างได้) · cache หน้าต่าง/แท็บที่ใช้ซ้ำในคำสั่งเดียวกัน
+
+**รอแบบมีเงื่อนไข ไม่ sleep ตายตัว**
+- ใช้ `wait <element>` / `waitgone <element>` / `until(fn, timeout)` — ไปต่อทันทีที่เงื่อนไขจริง
+- sleep ตายตัวได้เฉพาะช่วงสั้น (≤1 วิ) เช่น dropdown/animation · ยกเว้นฟีเจอร์ที่นับเวลาว่าง (ดู Gotcha)
+- งานยาวที่มีสัญญาณจบ (sync, export, รายงาน) → รอหน้าต่าง/ไฟล์/แถว DB ที่บอกว่าจบ แทนการ sleep ประมาณเวลา
+
+**คลิก/พิมพ์โดยไม่ลากเมาส์**
+- คลิกด้วย `tools\noclick.py` (PostMessage ไปที่หน้าต่างลูก ณ จุดนั้น) — เคอร์เซอร์ไม่ขยับ ไม่บล็อกแม้ปุ่มเปิด modal · ส่ง `pids` ของแอปเสมอ (กันคลิกโดนหน้าต่างอื่น; ถ้าถูกบังจะยกหน้าต่างแอปขึ้นก่อน)
+- ปุ่มที่ไม่เปิด modal ใช้ UIA Invoke ได้ · พิมพ์ด้วย `Focus()` + Keyboard หรือ Value pattern (ไม่ต้องคลิกช่องก่อน)
+- control ที่ไม่รับ PostMessage (เช่นปุ่มใน layout บางแบบ) → ปิด dialog ด้วย `WM_CLOSE` / ใช้ pattern ที่เหมาะ — ไม่กลับไปใช้เมาส์จริงถ้าเลี่ยงได้
+- ต้องใช้เมาส์จริง → `noclick` ตั้ง FlaUI `Mouse.MovePixelsPerMillisecond` สูงให้กระโดดทันที (ไม่ลาก)
+
+**ลดจำนวนครั้งที่เรียก process**
+- 1 process (และ 1 ครั้งที่เรียก admin runner) รันหลายขั้นต่อกัน (คั่นด้วย `;` หรือ sequence) — การเริ่ม Python + โหลด FlaUI กิน 2–6 วิ/ครั้ง
+- แยกการเรียกเฉพาะจุดที่ต้องดูผลก่อนตัดสินใจขั้นต่อไป
+
+**ไม่ทำซ้ำสิ่งที่ไม่จำเป็น**
+- เช็คสถานะก่อนนำทาง — อยู่หน้าเป้าหมายแล้ว (และตั้งค่าไว้แล้ว) ให้ข้าม · ใช้แอปที่เปิดอยู่ต่อ ไม่ปิดเปิด/login ซ้ำ เว้นแต่ต้องโหลด option ใหม่
+- เรียง TC ให้ใช้สถานะต่อกันได้ (login เดียว, หน้าเดียว) โดยไม่ทำให้ TC พึ่งผลกันจนแยกรันไม่ได้
+- ภาพหลักฐานถ่ายครั้งเดียวให้ครอบหลาย TC ได้ถ้าอยู่หน้าจอเดียวกัน
+
+**DB check หนัก**
+- query/SP ที่ช้าบนข้อมูลทั้งหมด → ค่าเริ่มต้นจำกัดช่วง (เช่นย้อนหลัง N วัน) + ตัวแปรเลือกรันแบบเต็ม · งานอิสระกัน (เช่น SP ก่อน/หลังแก้) รันคู่ขนาน · ช่วงที่เลือกต้องมีข้อมูล (ไม่มี → fail ไม่ใช่ผ่านลอยๆ)
+
+**วัดผล**
+- หลังรันทุกครั้งอ่านเวลาต่อ test จาก `output.xml` แล้วจดลง `notes.md` (เวลารวม + test ที่ช้าสุด) — เทียบกับรอบก่อนเมื่อแก้เพื่อความเร็ว
+
 ## Gotcha ของ UI automation (Windows desktop)
 - แอปรันแบบ Admin → ตัวกดต้องเป็น Admin ด้วย (UIPI) — ใช้ `tools\admin-runner` (Task Scheduler) ถ้า terminal ไม่ใช่ Admin
 - **ฟีเจอร์ที่นับเวลาว่าง (Auto Logout, screen saver)** ใช้ `GetLastInputInfo` — UIA `Invoke` และ FlaUI `Mouse.MoveBy` **ไม่นับเป็น input** (แอปเห็นเครื่องว่างตลอด → logout ทันทีหลัง login) ต้องใช้ `Click()` / `Keyboard.Press` จริง; ระหว่างรอใช้ sleep ไม่ใช่ loop ที่เรียก UIA (ช้า เวลาเพี้ยน); รวมทุกขั้นของ TC ไว้ในคำสั่งเดียว (คั่นคำสั่งแล้วแอปอาจ logout ไปก่อน)
-- ปุ่มที่เปิด modal (MessageBox/dialog) → `Invoke` ค้าง ใช้คลิกเมาส์
+- ปุ่มที่เปิด modal (MessageBox/dialog) → UIA `Invoke` ค้าง ใช้ `tools\noclick.py` (PostMessage) แทน
 - หา element ด้วย id ให้ **ระบุหน้าต่าง** (`btnSave@<WindowId>`) — id เดียวกันมีหลายหน้าต่าง ตัวแรกที่เจออาจซ่อนอยู่/คนละหน้า (คลิกพลาดโดยไม่ error)
 - ปุ่มเป็นสีเทา (`IsEnabled=False`) → กดไม่มีผล ตรวจก่อนสรุปว่าแอปไม่ตอบสนอง
 - script fail → ถ่ายภาพหน้าจอดูสถานะจริงก่อนแก้/รันซ้ำ (มักเป็น dialog ค้าง ไม่ใช่ระบบผิด)
@@ -200,3 +245,6 @@ Step
 ## ประวัติเวอร์ชัน
 - **1.0** (2026-11-13) — เวอร์ชันแรกที่ใช้งานจริง: 5 phase (context → fix/build → เตรียมข้อมูล → ทดสอบ default/manual → สรุป+automate+rollback) · gate 4 จุด · TC 2 ชุด · รายงาน TestResult/TestNote · automate ก่อน rollback · ลำดับต่อ 1 issue เป็น**กฎเหล็ก** (ห้ามข้าม/สลับ/รวบขั้น, ขั้น ◆ ต้องรอ user, ข้ามได้เมื่อ user สั่งชัด + จดเหตุผล) · ต้องผ่านในสภาพแวดล้อมเดียวกับที่ user รัน (encoding UTF-8, หน้าต่างบัง, คำสั่งตาม shell ของ user)
 - **1.1** (2026-11-13) — รองรับ Jira นอกจาก Azure DevOps: เลข issue แบบ `PROJ-123` ใช้ได้ทุกที่ (โฟลเดอร์/ชื่อ test/tag) · แหล่ง Test Scenario ของ Jira (Description / custom field / Acceptance Criteria / Xray-Zephyr / sub-task) · หา fix จาก Development panel + smart commit · รูปแบบข้อความแปะผล (Markdown / wiki markup / AzDO) · ค่าใหม่ใน local.md: {ISSUE_KEY_FORMAT} {TEST_SCENARIO_SOURCE} {FIX_LINK_SOURCE} {RESULT_POST_FORMAT}
+- **1.2** (2026-11-13) — FlaUI (UIA3) เป็นเครื่องมือหลักคุม UI (ห้ามเปลี่ยนวิธีเพราะติดปัญหา, dump UI tree เองก่อนขอ user) · หัวข้อใหม่ ประสิทธิภาพและเวลา: EnumWindows แทน FindAllChildren, wait/waitgone แทน sleep, คลิกแบบไม่ขยับเมาส์ `tools
+oclick.py`, รวมหลายขั้นต่อ process, ข้ามการนำทางซ้ำ, DB check หนักจำกัดช่วง+คู่ขนาน, จดเวลาต่อ test · ค่าใหม่ {FLAUI_HELPERS}
+- **1.3** (2026-11-13) — ลำดับหา locator ใหม่: แผนที่หน้าจอ {SCREEN_MAP} + UI tree ที่ export ไว้ → AutomationId จาก source → dump สดด้วย FlaUI เฉพาะจุดที่ไม่รู้/หาไม่เจอ (dump เฉพาะหน้าต่างนั้น แล้วบันทึกลงแผนที่ทันที) → ขอ user export → พิกัด · ค่าใหม่ {SCREEN_MAP}
