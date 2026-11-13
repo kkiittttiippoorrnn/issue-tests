@@ -13,9 +13,11 @@ SKILL.md อ้างค่าเหล่านี้ด้วยชื่อ�
 - {BUILD_DROP}: <โฟลเดอร์ที่วาง build ใหม่ + โครงสร้างย่อย>
 - {UI_SOURCE_GLOB}: <glob ไฟล์ที่นิยามชื่อ control เช่น **/*.Designer.vb, **/*.xaml>
 - {UI_INSPECTOR}: <เครื่องมือ export UI tree เช่น Accessibility Insights, FlaUInspect, เครื่องมือภายใน>
+- {SCREEN_MAP}: <แผนที่หน้าจอของแอป (ไฟล์ index + ไฟล์ dump ต่อหน้า) และโฟลเดอร์ UI tree ที่ export จาก inspector — Claude อ่านก่อนหา locator และบันทึกหน้าที่ dump ใหม่ลงที่นี่>
 
 ## Automation
 - {AUTOMATION_HOME}: <โปรเจกต์ Robot Framework ที่มี keyword พื้นฐานของแอป (launch/login) — ตั้งใน local.ps1 ด้วย>
+- {FLAUI_HELPERS}: <โฟลเดอร์สคริปต์ตัวช่วย FlaUI ของแอป (หาหน้าต่าง/คลิก/dump/wait) — ค่าเริ่มต้น `tools\` ของ repo นี้>
 - {BASE_KEYWORDS}: <รายการไฟล์ keyword ใน AUTOMATION_HOME + keyword สำคัญ เช่น Launch And Login, Close App>
 - ตัวแปร env สำหรับเปลี่ยน build / DB ต่อ issue: <เช่น APP_WORKDIR, DB_NAME>
 
