@@ -19,8 +19,15 @@ SKILL.md อ้างค่าเหล่านี้ด้วยชื่อ�
 - {BASE_KEYWORDS}: <รายการไฟล์ keyword ใน AUTOMATION_HOME + keyword สำคัญ เช่น Launch And Login, Close App>
 - ตัวแปร env สำหรับเปลี่ยน build / DB ต่อ issue: <เช่น APP_WORKDIR, DB_NAME>
 
-## Issue tracker
-- {ISSUE_TRACKER}: <วิธีอ่าน issue เช่น MCP tool ชื่อ..., CLI, หรือให้ user วาง>
+## Issue tracker (Azure DevOps หรือ Jira)
+- {ISSUE_TRACKER}: <ชนิด + วิธีอ่าน issue>
+  - Azure DevOps: เช่น MCP `azdo` (`show_work_item`, `list_work_item_comments`) หรือ `az boards work-item show`
+  - Jira: เช่น Atlassian MCP (อ่าน issue + comment + remote link), Jira REST `GET /rest/api/3/issue/<KEY>?expand=renderedFields`, หรือ `acli jira workitem view <KEY>`
+  - อ่านไม่ได้ / ไม่มีสิทธิ์ → ให้ user วางเนื้อหา
+- {ISSUE_KEY_FORMAT}: <รูปแบบเลข issue — AzDO: ตัวเลข เช่น `12345` · Jira: `<PROJECT>-<เลข>` เช่น `POS-123`>
+- {TEST_SCENARIO_SOURCE}: <Test Scenario อยู่ที่ไหน — AzDO: field เช่น `Custom.TestScenario` · Jira: หัวข้อใน Description, custom field (`customfield_xxxxx`), Acceptance Criteria, หรือ Test issue ที่ link ไว้ (Xray/Zephyr) / sub-task>
+- {FIX_LINK_SOURCE}: <หา PR/commit ของ fix — AzDO: relations "Fixed in Commit"/Pull Request · Jira: Development panel (branch/PR/commit) หรือ commit message ที่มี key>
+- {RESULT_POST_FORMAT}: <รูปแบบข้อความแปะผล — AzDO: ข้อความธรรมดา/HTML · Jira Cloud: Markdown (MCP/ADF) · Jira Server/DC: wiki markup (`*ตัวหนา*`, `{code}`)>
 
 ## DB และกติกาเฉพาะโค้ด
 - {DB_QUERY_TOOL}: <เช่น sqlcmd / psql + flag ที่ใช้ + วิธีอ่านภาษาที่ไม่ใช่อังกฤษ>

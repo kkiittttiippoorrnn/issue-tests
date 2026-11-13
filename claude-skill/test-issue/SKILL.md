@@ -1,11 +1,11 @@
 ---
 name: test-issue
-description: ทดสอบ issue แบบครบวงจรสำหรับ Tester — อ่าน issue/Test Scenario → หา build ที่มี fix → เตรียม/mock DB (ขออนุญาต) → แปลง TC เป็น Robot Framework test แล้วรันเอง → ตรวจหน้าจอ+DB → สรุป Pass/Fail + rollback. ใช้เมื่อ "/test-issue <ID>", "เทส issue นี้ให้", "ทดสอบตาม test scenario"
+description: ทดสอบ issue แบบครบวงจรสำหรับ Tester (Azure DevOps หรือ Jira) — อ่าน issue/Test Scenario → หา build ที่มี fix → เตรียม/mock DB (ขออนุญาต) → แปลง TC เป็น Robot Framework test แล้วรันเอง → ตรวจหน้าจอ+DB → สรุป Pass/Fail + rollback. ใช้เมื่อ "/test-issue <ID>", "เทส issue นี้ให้", "ทดสอบตาม test scenario"
 args: "<IssueID> [manual]"
-version: "1.0"
+version: "1.1"
 ---
 
-> **test-issue เวอร์ชัน 1.0** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
+> **test-issue เวอร์ชัน 1.1** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
 
 เมื่อ user เรียก `/test-issue <ID> [manual]` ทำตามขั้นตอนนี้ **ทีละ phase** ตอบเป็นภาษาของ user
 
@@ -46,13 +46,17 @@ version: "1.0"
 ## Phase 0 — โหลด context
 
 1. อ่าน `local.md` และ {TEST_INFO}
-2. อ่าน issue ตาม {ISSUE_TRACKER} (Description, comment ของ Dev, Test Scenario, attachments)
+2. อ่าน issue ตาม {ISSUE_TRACKER} (Description, comment ของ Dev, Test Scenario ตาม {TEST_SCENARIO_SOURCE}, attachments)
+   - `<ID>` = เลข issue ตาม {ISSUE_KEY_FORMAT} ใช้ตามจริงทุกที่ (โฟลเดอร์ `issues\<ID>\`, ชื่อ test `ISSUE-<ID>-TC<n>`, tag `issue-<ID>`) เช่น AzDO `12345` / Jira `POS-123`
+   - **Jira:** Test Scenario อาจกระจายหลายที่ — Description, custom field, Acceptance Criteria, sub-task, หรือ Test issue ที่ link ไว้ (Xray/Zephyr) → อ่านให้ครบแล้วสรุปว่าใช้จากที่ไหน · ดู comment + Development panel (branch/PR) · Jira Cloud ผ่าน MCP ยังไม่ authenticate → บอก user ให้เชื่อมต่อ (`/mcp`) หรือวางเนื้อหามา
+   - **Azure DevOps:** ดู field Test Scenario + comment + relations (PR / Fixed in Commit)
    - อ่านไม่ได้ / ไม่มีสิทธิ์ → ขอให้ user วาง: รายละเอียดจาก Dev + Test Scenario + DB ที่ใช้
 3. user ไม่ได้บอก DB → ถาม (ห้ามเดา) ค่าเริ่มต้นที่เสนอได้คือ DB ใน {TEST_INFO}
 
 ## Phase 1 — ตรวจ fix และ build
 
-1. หา commit ของ fix (จาก Test Scenario หรือ `git log --all --grep "<ID>"` ใน {SOURCE_REPO} หลัง `git fetch -q origin`)
+1. หา commit ของ fix ตาม {FIX_LINK_SOURCE} (PR/commit ที่ link กับ issue) หรือ `git log --all --grep "<ID>"` ใน {SOURCE_REPO} หลัง `git fetch -q origin`
+   - Jira: key (`POS-123`) อยู่ใน commit/branch ตาม smart commit — grep ตรงได้ · AzDO: เลขล้วนชนกับเลขอื่นง่าย → grep `#<ID>` หรือ `AB#<ID>` แล้วยืนยันกับ PR ที่ link ไว้
 2. `git branch -r --contains <sha>` → fix อยู่ branch ไหน
 3. `git show <sha>` → แก้ module ไหน + string/logic ที่เปลี่ยน
 4. หา build ใน {BUILD_DROP} (ใหม่สุดก่อน) แล้ว **พิสูจน์จาก binary จริง** ว่ามี fix:
@@ -120,7 +124,9 @@ repo นี้ (`issue-tests`) มีแค่ส่วนของ issue; keywo
 
 1. ผลต่อ TC: ✅ Pass / ❌ Fail / ⚠️ ตรวจได้บางส่วน + หลักฐาน (ID, ค่าใน DB, path report/screenshot)
 2. Build + DB ที่ใช้, ข้อมูล mock ที่ยังค้าง
-3. ข้อความสั้นพร้อมแปะใน issue tracker (ไม่ใช้ตาราง)
+3. ข้อความสั้นพร้อมแปะใน issue tracker (ไม่ใช้ตาราง) ตาม {RESULT_POST_FORMAT}
+   - Jira Cloud: Markdown (`**ตัวหนา**`, `- รายการ`) · Jira Server/DC: wiki markup (`*ตัวหนา*`, `* รายการ`, `{code}...{code}`) · AzDO: ข้อความธรรมดา/HTML
+   - ข้อความอ้างไฟล์แนบ `TestResult_<ID>.html` / `TestNote_<ID>.html` — Claude ไม่โพสต์/ไม่เปลี่ยนสถานะ issue เอง (user ทำ ตามกฎเหล็กขั้น 9)
 4. **ทำ Automate เก็บไว้ทุก issue (ก่อน rollback — ข้อมูล mock ยังอยู่)** — แม้เทสรอบแรกจะทำแบบ manual หรือสคริปต์ชั่วคราว
    - `issues\<ID>\issue.robot` 1 test ต่อ TC (ชื่อ/tag ตาม Phase 3A) ใช้ขั้นตอนที่ **ผ่านจริงแล้ว** ในรอบเทส (locator, การรอ, หน้าต่างที่ระบุ) ไม่ต้องสำรวจใหม่
    - ทุก test มี assertion อัตโนมัติ: หน้าจอ (หน้าต่าง/ข้อความที่ต้องเห็น + ไม่มี error dialog) และ DB (SELECT ก่อน → หลัง) — ห้ามมี test ที่แค่กดโดยไม่ตรวจ
@@ -193,3 +199,4 @@ Step
 
 ## ประวัติเวอร์ชัน
 - **1.0** (2026-11-13) — เวอร์ชันแรกที่ใช้งานจริง: 5 phase (context → fix/build → เตรียมข้อมูล → ทดสอบ default/manual → สรุป+automate+rollback) · gate 4 จุด · TC 2 ชุด · รายงาน TestResult/TestNote · automate ก่อน rollback · ลำดับต่อ 1 issue เป็น**กฎเหล็ก** (ห้ามข้าม/สลับ/รวบขั้น, ขั้น ◆ ต้องรอ user, ข้ามได้เมื่อ user สั่งชัด + จดเหตุผล) · ต้องผ่านในสภาพแวดล้อมเดียวกับที่ user รัน (encoding UTF-8, หน้าต่างบัง, คำสั่งตาม shell ของ user)
+- **1.1** (2026-11-13) — รองรับ Jira นอกจาก Azure DevOps: เลข issue แบบ `PROJ-123` ใช้ได้ทุกที่ (โฟลเดอร์/ชื่อ test/tag) · แหล่ง Test Scenario ของ Jira (Description / custom field / Acceptance Criteria / Xray-Zephyr / sub-task) · หา fix จาก Development panel + smart commit · รูปแบบข้อความแปะผล (Markdown / wiki markup / AzDO) · ค่าใหม่ใน local.md: {ISSUE_KEY_FORMAT} {TEST_SCENARIO_SOURCE} {FIX_LINK_SOURCE} {RESULT_POST_FORMAT}
