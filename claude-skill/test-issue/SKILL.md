@@ -2,9 +2,30 @@
 name: test-issue
 description: ทดสอบ issue แบบครบวงจรสำหรับ Tester — อ่าน issue/Test Scenario → หา build ที่มี fix → เตรียม/mock DB (ขออนุญาต) → แปลง TC เป็น Robot Framework test แล้วรันเอง → ตรวจหน้าจอ+DB → สรุป Pass/Fail + rollback. ใช้เมื่อ "/test-issue <ID>", "เทส issue นี้ให้", "ทดสอบตาม test scenario"
 args: "<IssueID> [manual]"
+version: "1.0"
 ---
 
+> **test-issue เวอร์ชัน 1.0** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
+
 เมื่อ user เรียก `/test-issue <ID> [manual]` ทำตามขั้นตอนนี้ **ทีละ phase** ตอบเป็นภาษาของ user
+
+### ⛔ กฎเหล็ก: ลำดับต่อ 1 issue (◆ = ต้องหยุดรอ user)
+**บังคับทุก issue — ห้ามข้ามขั้น ห้ามสลับลำดับ ห้ามรวบหลายขั้นในครั้งเดียว**
+- ขั้น ◆ ต้องได้คำตอบจาก user ในข้อความใหม่ก่อนไปขั้นถัดไป — การอนุญาตขั้นหนึ่งไม่นับเป็นการอนุญาตขั้นอื่น (อนุญาต mock ≠ อนุญาตเริ่มเทส ≠ อนุญาต rollback)
+- ข้ามขั้นได้เฉพาะเมื่อ user **สั่งชัดเจน** ให้ข้ามขั้นนั้น (เช่น "ไม่ต้องทำ automate") → จดคำสั่ง + เหตุผลลง `notes.md` ทุกครั้ง
+- ข้อยกเว้นเฉพาะ user/องค์กร (เช่นช่วงเวลาที่เริ่มเทสได้ทันที) ต้องเขียนไว้ใน `local.md` เท่านั้น — ห้ามอนุมานเอง
+- ขั้นไหนทำไม่ได้ (ไม่มีสิทธิ์ / build ไม่มี fix / แอปเปิดไม่ได้) → หยุดที่ขั้นนั้น แจ้ง user พร้อมสาเหตุ ห้ามข้ามไปขั้นถัดไป
+- ทุกครั้งที่รายงานความคืบหน้า บอกว่าอยู่ขั้นไหน (เช่น "ขั้น 5/9")
+
+1. เริ่ม session ใหม่ (`/clear`) → `/test-issue <ID>`
+2. อ่าน issue → ตรวจ fix/build จาก binary จริง + เช็คว่าโฟลเดอร์ที่ใช้รันคือ build นั้น → เช็ค DB/SP
+3. หาเงื่อนไขบั๊ก → query DB → ◆ ขออนุญาต mock (SQL + ค่าเดิม + `rollback.sql`)
+4. ◆ ส่งสรุป Test Case 2 ชุด แล้วรอคำว่า "เริ่ม"
+5. ◆ แจ้งก่อนคุมหน้าจอ → เทสทีละ TC (หน้าจอ + DB + หลักฐาน) · fail ต้องแยก test พัง vs ระบบพัง
+6. สรุปผล TC + ข้อความแปะ issue tracker → รายงาน `TestResult_<ID>.html` + `TestNote_<ID>.html`
+7. Automate ก่อน rollback: `issue.robot` + `setup.sql` → DryRun → ◆ รันจริงผ่าน → ◆ user รันจาก terminal ของ user เองผ่าน 1 รอบ
+8. ◆ ขออนุญาต rollback → รัน + SELECT ยืนยัน
+9. บันทึก `notes.md` (ผล / rollback / automate / วิธีรัน) → ◆ user แจ้งผลใน issue tracker เอง
 
 > **ก่อนเริ่ม: อ่าน `local.md` ในโฟลเดอร์เดียวกับไฟล์นี้** — ค่าในวงเล็บปีกกา ({APP_NAME}, {SOURCE_REPO}, ...) และกติกาเฉพาะระบบอยู่ในนั้น
 > ไม่มี `local.md` → หยุด บอก user ให้ทำตาม `ADAPTING.md` ที่ root ของ repo (คัดลอก `local.example.md` แล้วกรอก) — ห้ามเดา path/ชื่อระบบ
@@ -100,10 +121,21 @@ repo นี้ (`issue-tests`) มีแค่ส่วนของ issue; keywo
 1. ผลต่อ TC: ✅ Pass / ❌ Fail / ⚠️ ตรวจได้บางส่วน + หลักฐาน (ID, ค่าใน DB, path report/screenshot)
 2. Build + DB ที่ใช้, ข้อมูล mock ที่ยังค้าง
 3. ข้อความสั้นพร้อมแปะใน issue tracker (ไม่ใช้ตาราง)
-4. **Gate:** ถามก่อนรัน rollback → รันแล้ว SELECT ยืนยันค่ากลับเป็นค่าเดิม
-5. อัปเดต `issues\<ID>\notes.md` ด้วยผลสุดท้าย + สถานะ rollback; test เก็บไว้เป็น regression — รันซ้ำด้วย `.\run.ps1 -Issue <ID>`
-6. โหมด manual ก็สร้าง `notes.md` + `rollback.sql` เหมือนกัน (ไม่ต้องมี issue.robot)
-7. user สั่ง commit → `git status` ก่อน ต้องไม่มี `issues/<ID>/`, `local.md`, `local.ps1` หลุดเข้า stage
+4. **ทำ Automate เก็บไว้ทุก issue (ก่อน rollback — ข้อมูล mock ยังอยู่)** — แม้เทสรอบแรกจะทำแบบ manual หรือสคริปต์ชั่วคราว
+   - `issues\<ID>\issue.robot` 1 test ต่อ TC (ชื่อ/tag ตาม Phase 3A) ใช้ขั้นตอนที่ **ผ่านจริงแล้ว** ในรอบเทส (locator, การรอ, หน้าต่างที่ระบุ) ไม่ต้องสำรวจใหม่
+   - ทุก test มี assertion อัตโนมัติ: หน้าจอ (หน้าต่าง/ข้อความที่ต้องเห็น + ไม่มี error dialog) และ DB (SELECT ก่อน → หลัง) — ห้ามมี test ที่แค่กดโดยไม่ตรวจ
+   - ขั้นที่ไวต่อเวลา/input จริง (เช่น Auto Logout) เรียก `tools\ui_step.py` ผ่าน `Run Process` ได้
+   - `issues\<ID>\setup.sql` = ตั้งข้อมูล/option ให้อยู่ในสถานะพร้อมเทส (คู่กับ `rollback.sql`) — regression ต้องรันซ้ำได้หลัง rollback
+   - TC ที่เทสไม่ได้ (N/A) → `Skip` พร้อมเหตุผล · TC ที่ต้องปิดเปิดแอป/เปลี่ยน option → tag แยก (เช่น `restart`) ให้เลือกรัน
+   - DryRun → **Gate (รัน UI)** → รันจริง 1 รอบให้ผ่านทั้งหมด → จด `.\run.ps1 -Issue <ID>` + เวลาที่ใช้ + เงื่อนไขก่อนรัน ลง `notes.md`
+   - **ต้องผ่านในสภาพแวดล้อมเดียวกับที่ user จะรัน** — ผ่านจาก runner/Task ของ Claude อย่างเดียวยังไม่นับว่าเสร็จ: ให้ user รันคำสั่งที่ส่งให้จาก terminal ของ user เอง (เช่น CMD แบบ Admin) แล้วผ่าน 1 รอบ
+     - สาเหตุที่ผ่านใน runner แต่ fail ที่ user: encoding ของ console (`Run Process` ต้องใส่ `output_encoding=UTF-8` เมื่อเทียบข้อความนอก ASCII) · หน้าต่าง terminal ของ user บังแอป (การคลิกต้องยกหน้าต่างแอปขึ้นก่อน) · venv/robot คนละตัวกับที่ runner ใช้
+     - คำสั่งที่ให้ user ต้องเป็นของ shell ที่ user ใช้จริง (CMD: `powershell -ExecutionPolicy Bypass -File run.ps1 -Issue <ID>`) พร้อมคำสั่งเปิด `report.html` ของรอบล่าสุด
+   - user สั่งข้ามได้ ("ไม่ต้องทำ automate") — ถ้าข้ามให้บันทึกเหตุผลใน `notes.md`
+5. **Gate:** ถามก่อนรัน rollback → รันแล้ว SELECT ยืนยันค่ากลับเป็นค่าเดิม
+6. อัปเดต `issues\<ID>\notes.md` ด้วยผลสุดท้าย + สถานะ rollback + สถานะ automate; test เก็บไว้เป็น regression — รันซ้ำด้วย `.\run.ps1 -Issue <ID>`
+7. โหมด manual ก็สร้าง `notes.md` + `rollback.sql` และทำ automate ตามข้อ 4 เหมือนกัน
+8. user สั่ง commit → `git status` ก่อน ต้องไม่มี `issues/<ID>/`, `local.md`, `local.ps1` หลุดเข้า stage
 
 ---
 
@@ -134,6 +166,7 @@ Step
 ```
 
 ### รายงาน HTML (`issues\<ID>\make_report.py` จากแม่แบบใน `_template`)
+- **ระดับงานที่ต้องได้: ดู `docs\example\TestResult_EXAMPLE.html` + `TestNote_EXAMPLE.html`** (และ `docs\example\make_report.py` = ตัวอย่างการกรอกแม่แบบ) — ทำรูป/รายงานให้ได้อย่างน้อยระดับนี้
 - `TestResult_<ID>.html` — บล็อก **TEST PASS** (TC/ส่วนที่ผ่าน) แล้วบล็อก **TEST FAIL** (เฉพาะถ้ามีส่วนที่ไม่ผ่าน) แต่ละบล็อกมีหัว `Test Status / Test on Date / Test Version / Test By` ของตัวเอง ไม่มีส่วน "สรุปผล" ด้านบน
   - TC ที่ผลปนกัน → อยู่ทั้ง 2 บล็อก พร้อมป้าย "ผลที่ผ่าน (PASS)" / "ผลที่ไม่ผ่าน (FAIL)" และรูปเฉพาะส่วนนั้น
   - ใส่ชุดเทสเพิ่มรวมในไฟล์เดียวกันได้ถ้า user ต้องการ
@@ -154,3 +187,9 @@ Step
 - ปุ่มเป็นสีเทา (`IsEnabled=False`) → กดไม่มีผล ตรวจก่อนสรุปว่าแอปไม่ตอบสนอง
 - script fail → ถ่ายภาพหน้าจอดูสถานะจริงก่อนแก้/รันซ้ำ (มักเป็น dialog ค้าง ไม่ใช่ระบบผิด)
 - ผล "แปลก" ให้แยก test พัง vs ระบบพังเสมอ — เช่นวัด idle ของระบบจริง (`tools\ui_step.py` แสดง `sys_idle_ms`) ก่อนสรุปว่าแอปผิด
+
+
+---
+
+## ประวัติเวอร์ชัน
+- **1.0** (2026-11-13) — เวอร์ชันแรกที่ใช้งานจริง: 5 phase (context → fix/build → เตรียมข้อมูล → ทดสอบ default/manual → สรุป+automate+rollback) · gate 4 จุด · TC 2 ชุด · รายงาน TestResult/TestNote · automate ก่อน rollback · ลำดับต่อ 1 issue เป็น**กฎเหล็ก** (ห้ามข้าม/สลับ/รวบขั้น, ขั้น ◆ ต้องรอ user, ข้ามได้เมื่อ user สั่งชัด + จดเหตุผล) · ต้องผ่านในสภาพแวดล้อมเดียวกับที่ user รัน (encoding UTF-8, หน้าต่างบัง, คำสั่งตาม shell ของ user)
