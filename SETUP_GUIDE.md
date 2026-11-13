@@ -32,7 +32,7 @@ Claude จะสำรวจเครื่อง ถามข้อมูลท
 ### 1.4 สิ่งที่ต้องทำเองแบบ Admin
 - แอปที่ทดสอบต้องรันแบบ Admin → เปิด PowerShell แบบ **Run as administrator** แล้ว `.\tools\admin-runner\setup_task.ps1` (ครั้งเดียว)
   จากนั้น Claude ใน terminal ธรรมดาก็กดแอปได้ (ผ่าน Task Scheduler)
-- ต่อ issue tracker (เช่น Azure DevOps) ผ่าน MCP ตามที่ทีมใช้ — ไม่มีก็ได้ ให้วางรายละเอียด issue ในแชทแทน
+- ต่อ issue tracker ผ่าน MCP ตามที่ทีมใช้ — Azure DevOps (MCP `azdo`) หรือ Jira (Atlassian MCP: พิมพ์ `/mcp` แล้วเชื่อมต่อ) · ไม่มีก็ได้ ให้วางรายละเอียด issue ในแชทแทน
 
 ### 1.5 ทดสอบว่าพร้อม
 ```powershell
@@ -72,6 +72,8 @@ Claude **ไม่ได้เรียนรู้ถาวรจากกา�
 - TC แยก 2 ชุด: ชุดลง issue (ตาม spec) + ชุดเทสเพิ่ม (จุดที่อาจกระทบ)
 - รายงาน HTML แยกบล็อก TEST PASS / TEST FAIL + ข้อสังเกตแยกไฟล์ TestNote
 - รูปหลักฐาน crop + กรอบ + ป้ายบอกผล
+- ลำดับ 9 ขั้นต่อ issue เป็นกฎเหล็ก · FlaUI เป็นเครื่องมือหลัก · หา locator จากแผนที่หน้าจอก่อน dump สด
+- automate ต้องผ่านจาก terminal ของ user เองด้วย
 
 ### 2.3 ส่งต่อสิ่งที่สอนให้เพื่อน
 - กฎที่ทุกคนควรใช้ → ย้ายจาก memory เข้า SKILL.md แล้ว commit/push (เขียนแบบทั่วไป ห้ามมีชื่อ DB/รหัสผ่าน/ชื่อเครื่อง)
@@ -81,15 +83,28 @@ Claude **ไม่ได้เรียนรู้ถาวรจากกา�
 ---
 
 ## ส่วนที่ 3 — ใช้งานประจำวัน
+ลำดับเป็น **กฎเหล็ก** ของ skill (ห้ามข้าม/สลับ/รวบขั้น) — Claude บอกเสมอว่าอยู่ขั้นไหน (เช่น "ขั้น 5/9")
 ```
 /clear                       เริ่ม issue ใหม่ทุกครั้ง (1 issue ต่อ 1 session — ประหยัด token และไม่ปนข้อมูล)
-/test-issue 1234             Claude อ่าน issue → หา build → สรุป Test Case แล้วรอ
-เริ่ม                         Claude mock ข้อมูล (ขออนุญาตก่อน) แล้วเทส
-รายงานผลให้หน่อย              ได้ TestResult_1234.html + TestNote_1234.html + ข้อความแปะ issue
+/test-issue 1234             Claude อ่าน issue → ตรวจ build → เสนอ mock (Jira: /test-issue POS-123)
+อนุญาต mock                  Claude mock + เขียน rollback.sql → ส่งสรุป Test Case แล้วรอ
+เริ่ม                         Claude แจ้งก่อนคุมหน้าจอ แล้วเทสทีละ TC
+(Claude ส่งผล)               ได้ TestResult_1234.html + TestNote_1234.html + ข้อความแปะ issue
+(automate)                   Claude ทำ issue.robot + setup.sql รันผ่าน → คุณรันจาก CMD (Admin) อีก 1 รอบ
 rollback ได้                  คืนข้อมูลทดสอบ แล้ว SELECT ยืนยัน
+                             คุณแปะผล/แนบรายงานใน issue tracker เอง
 ```
-- ระหว่าง Claude กดหน้าจอ **ห้ามแตะเมาส์/คีย์บอร์ด** (โดยเฉพาะเทสที่นับเวลาว่าง เช่น Auto Logout)
+- ไม่ต้องทำ automate ใบไหน → สั่ง "ไม่ต้องทำ robot" (Claude จดเหตุผลลง notes.md)
+- ระหว่าง Claude คุมแอป ไม่ต้องแตะเครื่อง — คลิกแบบไม่ขยับเมาส์ แต่เทสที่นับเวลาว่าง (เช่น Auto Logout) ใช้ input จริง ห้ามแตะเด็ดขาด
 - Claude ขออนุญาตทุกครั้งก่อน: แก้ข้อมูลใน DB, รัน UI ครั้งแรก, rollback, git commit/push
+
+รันเทสซ้ำเอง (CMD แบบ Run as administrator):
+```bat
+cd /d <โฟลเดอร์ repo>
+powershell -ExecutionPolicy Bypass -File run.ps1 -Issue 1234
+cd issues\1234\evidence & dir /b /ad /o-n 2026*
+start "" <โฟลเดอร์บนสุด>\report.html
+```
 
 ## ปัญหาที่พบบ่อย
 | อาการ | แก้ |
@@ -98,4 +113,6 @@ rollback ได้                  คืนข้อมูลทดสอบ �
 | Claude กดแอปไม่ติด | แอปรันแบบ Admin → ตั้ง `tools\admin-runner` (ข้อ 1.4) |
 | ตัวรันแบบ Admin ค้าง | แอปมี dialog ค้าง — ดูหน้าจอ แล้ว `schtasks /end /tn ClaudeAdminRunner` |
 | Claude ทำไม่ตรงแบบที่เคยสอน | ดู memory / SKILL.md ว่ามีกฎนั้นไหม หรือมีกฎขัดกัน |
-| MCP (issue tracker) ต่อไม่ได้ | พิมพ์ `/mcp` → reconnect · หรือวางรายละเอียด issue ในแชทแทน |
+| MCP (issue tracker) ต่อไม่ได้ | พิมพ์ `/mcp` → reconnect (Jira: เชื่อม Atlassian) · หรือวางรายละเอียด issue ในแชทแทน |
+| automate ผ่านตอน Claude รัน แต่ fail ตอนรันเองจาก CMD | ภาษาไทยเพี้ยนใน output (`α╕...`) → `Run Process` ต้องมี `output_encoding=UTF-8` · หน้าต่างอื่นบังแอป → ใช้ `tools\noclick.py` (ยกหน้าต่างแอปให้เอง) · บอก Claude พร้อมโฟลเดอร์ evidence ของรอบนั้น |
+| เทสช้า / เมาส์ลากไปมา | ตัวช่วยยังใช้ `Desktop.FindAllChildren` หรือ sleep ตายตัว / คลิกเมาส์จริง → ให้ Claude ปรับตามหัวข้อ "ประสิทธิภาพและเวลา" ใน SKILL.md |
