@@ -1,4 +1,4 @@
-# issue-tests — โครงทดสอบราย issue + Claude Code skill `/test-issue` (v1.3)
+# issue-tests — โครงทดสอบราย issue + Claude Code skill `/test-issue` (v2.0)
 
 Template สำหรับ Tester ที่ใช้ Claude Code ทดสอบ issue แบบครบวงจร:
 อ่าน issue (Azure DevOps หรือ Jira) → หา build ที่มี fix → เตรียมข้อมูลทดสอบ → คุม UI ด้วย **FlaUI** + Robot Framework → ตรวจหน้าจอ + DB → รายงาน + automate เก็บเป็น regression → rollback
@@ -41,7 +41,8 @@ issue-tests/
 │   └── locators/app_screens.resource    locator ที่ keyword ข้างบนใช้
 ├── libraries/                ตัวอย่าง library ตรวจ DB (SELECT อย่างเดียว) + HlMark.py (รูปหลักฐานมีกรอบ/ป้าย)
 └── tools/
-    ├── noclick.py            คลิกแบบไม่ขยับเมาส์ (PostMessage) + กันคลิกโดนหน้าต่างอื่น + ยกหน้าต่างแอปเมื่อถูกบัง
+    ├── flaui_kit.py          (v2) FlaUI library ไฟล์เดียว: Robot library ใน process เดียว + CLI · locator id:/name:/type: · Select Item · Message Box · ไม่มีพิกัด
+    ├── noclick.py            คลิกแบบไม่ขยับเมาส์ (PostMessage) + กันคลิกโดนหน้าต่างอื่น + ดึงหน้าต่างแอปขึ้นหน้าสุด
     ├── ui_step.py            ตัวกด UI แบบสั้น (FlaUI) รวมหลายขั้นในคำสั่งเดียว + snap ภาพทุกจอ
     └── admin-runner/         รันสคริปต์แบบ Admin ผ่าน Task Scheduler (แอปรันแบบ Admin แต่ terminal ไม่ใช่)
 ```
@@ -58,6 +59,17 @@ issue-tests/
 /test-issue 1234          Claude คุม UI เอง (FlaUI)          · Jira: /test-issue POS-123
 /test-issue 1234 manual   Claude ให้ขั้นตอน คุณกดเอง Claude ตรวจ DB
 ```
+ตัวอย่าง test ด้วย `flaui_kit` (v2):
+```robotframework
+Library    ${CURDIR}/../../tools/flaui_kit.py    MyApp    C:/Apps/MyApp.exe    AS    APP
+...
+    APP.Start App       wait_window=FrmLogin
+    APP.Type Text       id:txtUser    tester    window=FrmLogin
+    APP.Click           type:Hyperlink|name:Change password    window=FrmLogin
+    APP.Select Item     id:cbxReason    Wrong item    window=DlgCancel
+    ${msg}=    APP.Message Box    expected=Saved    known=FrmLogin,FrmMain
+```
+
 รันเทสซ้ำเอง — **CMD แบบ Run as administrator** (แอปรันแบบ Admin):
 ```bat
 cd /d <โฟลเดอร์ repo>
@@ -75,7 +87,7 @@ start "" <โฟลเดอร์บนสุด>\report.html
 - automate นับว่าเสร็จเมื่อผ่านจาก terminal ของคุณเองอย่างน้อย 1 รอบ (ไม่ใช่แค่ผ่านใน runner ของ Claude)
 
 ## หลักการที่ skill บังคับ (สรุป — รายละเอียดใน SKILL.md)
-- **FlaUI (UIA3) เป็นเครื่องมือหลัก** — ติดปัญหาให้แก้ตัวช่วย FlaUI ไม่เปลี่ยนไปวิธีอื่น
+- **FlaUI (UIA3) ผ่าน `tools/flaui_kit.py` เป็นเครื่องมือหลัก** — Robot เรียกเป็น library ใน process เดียว (เร็วกว่าเรียกสคริปต์ทีละขั้นราว 5 เท่า) · ติดปัญหาให้แก้ที่ kit ไม่เปลี่ยนไปวิธีอื่น
 - **หา locator จากแผนที่หน้าจอ / UI tree ที่ export ไว้ก่อน** (`{SCREEN_MAP}`) → id จาก source → dump สดเฉพาะจุดที่ไม่รู้ แล้วบันทึกลงแผนที่ทันที
 - **ความเร็ว:** หาหน้าต่างด้วย EnumWindows · รอแบบมีเงื่อนไข (`wait`/`waitgone`) แทน sleep · รวมหลายขั้นต่อ process · ข้ามการนำทางซ้ำ · DB check หนักจำกัดช่วง + คู่ขนาน · จดเวลาต่อ test
 - **ทุก test ตรวจทั้งหน้าจอและ DB** · `setup.sql` คู่ `rollback.sql` ให้รันซ้ำได้

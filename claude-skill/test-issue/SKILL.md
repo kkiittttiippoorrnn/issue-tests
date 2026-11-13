@@ -2,10 +2,10 @@
 name: test-issue
 description: ทดสอบ issue แบบครบวงจรสำหรับ Tester (Azure DevOps หรือ Jira) — อ่าน issue/Test Scenario → หา build ที่มี fix → เตรียม/mock DB (ขออนุญาต) → คุม UI ด้วย FlaUI + Robot Framework แล้วรันเอง → ตรวจหน้าจอ+DB → สรุป Pass/Fail + rollback. ใช้เมื่อ "/test-issue <ID>", "เทส issue นี้ให้", "ทดสอบตาม test scenario"
 args: "<IssueID> [manual]"
-version: "1.3"
+version: "2.0"
 ---
 
-> **test-issue เวอร์ชัน 1.3** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
+> **test-issue เวอร์ชัน 2.0** (2026-11-13) — ประวัติการแก้ดูหัวข้อ "ประวัติเวอร์ชัน" ท้ายไฟล์
 
 เมื่อ user เรียก `/test-issue <ID> [manual]` ทำตามขั้นตอนนี้ **ทีละ phase** ตอบเป็นภาษาของ user
 
@@ -79,7 +79,12 @@ version: "1.3"
 
 ### 3A. โหมด default — FlaUI (UIA3) + Robot Framework
 
-**เครื่องมือหลักในการคุม UI = FlaUI (UIA3)** ผ่านสคริปต์ Python ตัวช่วยใน {FLAUI_HELPERS} / `tools\` (เรียกจาก `.robot` ด้วย `Run Process`) หรือ library `FlaUILibrary` ของ robotframework-flaui
+**เครื่องมือหลักในการคุม UI = FlaUI (UIA3) ผ่าน `tools\flaui_kit.py`** (v2) — library ไฟล์เดียวใช้ได้ทุกแอป:
+- **Robot:** `Library  ${ISSUE_TESTS}/tools/flaui_kit.py  <process>  <exe>  AS  <ชื่อ>` → keyword ทำงานใน process เดียว **ห้ามใช้ `Run Process` เรียกสคริปต์ทีละขั้น** (เสีย 2–6 วิ/ครั้ง) · หลายแอปในชุดเดียวใช้หลาย instance (`AS POS` / `AS HQ`)
+- **CLI (เทสสด/สำรวจ):** `python -X utf8 tools\flaui_kit.py --proc <process> [--exe <path>] <คำสั่ง> ... ; <คำสั่ง> ...` — คำสั่งชุดเดียวกับ keyword (`@<หน้าต่าง>`, `k=v`)
+- Locator: `id:<AutomationId>` · `name:<Name>` · `type:<ControlType>` รวมด้วย `|` · `#2` = ตัวที่ 2 · หน้าต่าง = AutomationId/Name (รวม dialog ลูก) หรือ `#0` = บนสุด (popup ไม่มีชื่อ)
+- keyword หลัก: Start App / Kill App · Wait / Wait Gone / Wait Window / Wait Window Gone · Click (ไม่ขยับเมาส์) / Invoke · Type Text / Set Value / Press Keys (ดึงหน้าต่างขึ้นหน้าสุดก่อนพิมพ์) · **Select Item** (combo/dropdown/checked combo ด้วย element จริง) · Message Box · Close Window / Close Any Window · No Error Dialog · Grid Rows · Rect · Screenshot · Dump · At Point (แปลงพิกัดเดิมเป็น locator)
+- ตัวช่วยเฉพาะแอปที่ยังไม่ได้ย้าย ({FLAUI_HELPERS}) ใช้ได้ระหว่างย้าย — งานใหม่เขียนด้วย `flaui_kit` เท่านั้น
 - ห้ามเปลี่ยนไปใช้วิธีอื่น (RPA.Windows, pywinauto, MCP คุมหน้าจอ, ให้ user กด/แคปจอ) เพียงเพราะ FlaUI ติดปัญหา — แก้ที่ตัวช่วย FlaUI ก่อน · โหมด manual ใช้เมื่อ user สั่งเท่านั้น
 - หา locator จาก **แผนที่หน้าจอ {SCREEN_MAP} / UI tree ที่ export ไว้แล้ว** ก่อนเสมอ — dump สดด้วย FlaUI เฉพาะจุดที่ยังไม่รู้ (ดูลำดับ Locator ด้านล่าง)
 - ทำตามหัวข้อ **"ประสิทธิภาพและเวลา"** ด้านล่างทุกครั้งที่เขียน/แก้ตัวช่วยหรือ `.robot`
@@ -95,7 +100,7 @@ repo นี้ (`issue-tests`) มีแค่ส่วนของ issue; keywo
       - dump เฉพาะหน้าต่าง/element นั้น จำกัดความลึก — ห้าม dump ทั้งแอปหรือ dump หน้าที่แผนที่มีอยู่แล้ว
       - **บันทึกผลลง {SCREEN_MAP} ทันที** (ทางเข้า, id, ControlType+Name, ข้อควรระวัง) — เก็บเฉพาะของที่ใช้ซ้ำได้ ไม่เก็บข้อมูลเฉพาะ issue
    4. ให้ user export จาก {UI_INSPECTOR} — เมื่อ dump แล้วยังไม่ได้ (เช่น popup ที่หายเร็ว) บอกชัดว่าหน้าจอไหน จังหวะไหน
-   5. พิกัดภายในหน้าต่าง — ทางสุดท้าย + comment ว่าเปราะ (ขึ้นกับความละเอียดจอ)
+   5. พิกัดภายในหน้าต่าง — ทางสุดท้าย + comment ว่าเปราะ (ขึ้นกับความละเอียดจอ) · ใช้ `At Point` แปลงพิกัดเดิมเป็น locator ก่อนเสมอ
    - element ที่ไม่มี id ใช้ ControlType + Name (ตามภาษาบนจอ) · ลิงก์ (LinkLabel) ให้คลิกที่ Hyperlink ลูก ไม่ใช่กลางกรอบ Text
    - การอ่าน**ค่า**บนจอระหว่างเทส (ข้อความใน dialog, ค่าในช่อง, รายการใน grid) ยังอ่านสดตามปกติ — ไม่นับเป็นการ dump
    - ทำตามข้อจำกัด UI ใน `local.md` (เช่นภาษาที่แสดงบนจอ)
@@ -212,10 +217,13 @@ Step
 **คลิก/พิมพ์โดยไม่ลากเมาส์**
 - คลิกด้วย `tools\noclick.py` (PostMessage ไปที่หน้าต่างลูก ณ จุดนั้น) — เคอร์เซอร์ไม่ขยับ ไม่บล็อกแม้ปุ่มเปิด modal · ส่ง `pids` ของแอปเสมอ (กันคลิกโดนหน้าต่างอื่น; ถ้าถูกบังจะยกหน้าต่างแอปขึ้นก่อน)
 - ปุ่มที่ไม่เปิด modal ใช้ UIA Invoke ได้ · พิมพ์ด้วย `Focus()` + Keyboard หรือ Value pattern (ไม่ต้องคลิกช่องก่อน)
+- คีย์บอร์ดไปที่หน้าต่าง foreground เท่านั้น → ดึงหน้าต่างขึ้นหน้าสุดก่อนพิมพ์ (`noclick.activate`) · พิมพ์ทีละ token เว้น ~0.3 วิ (ช่องสแกน/ค้นหาทำงานตอน TextChanged) · id ซ้ำหลายชนิด (เช่น `1001` ใน Save As มีทั้ง ComboBox และ Edit) ระบุ `type:` ด้วย
+- DevExpress LookUp: ตั้งข้อความที่ตรงรายการผ่าน Value pattern = เลือกแล้ว (popup ที่เด้งก็คลิกได้) · DevExpress CheckedCombo: เปิด popup → ติ๊ก CheckBox → OK · ปุ่ม Open ใน DevExpress Edit ไม่รับคลิก PostMessage
 - control ที่ไม่รับ PostMessage (เช่นปุ่มใน layout บางแบบ) → ปิด dialog ด้วย `WM_CLOSE` / ใช้ pattern ที่เหมาะ — ไม่กลับไปใช้เมาส์จริงถ้าเลี่ยงได้
 - ต้องใช้เมาส์จริง → `noclick` ตั้ง FlaUI `Mouse.MovePixelsPerMillisecond` สูงให้กระโดดทันที (ไม่ลาก)
 
 **ลดจำนวนครั้งที่เรียก process**
+- automate: เรียก `flaui_kit` เป็น Robot library ใน process เดียว (วัดจริง: 4 test จาก 116 วิ → 21 วิ)
 - 1 process (และ 1 ครั้งที่เรียก admin runner) รันหลายขั้นต่อกัน (คั่นด้วย `;` หรือ sequence) — การเริ่ม Python + โหลด FlaUI กิน 2–6 วิ/ครั้ง
 - แยกการเรียกเฉพาะจุดที่ต้องดูผลก่อนตัดสินใจขั้นต่อไป
 
@@ -247,3 +255,4 @@ Step
 - **1.1** (2026-11-13) — รองรับ Jira นอกจาก Azure DevOps: เลข issue แบบ `PROJ-123` ใช้ได้ทุกที่ (โฟลเดอร์/ชื่อ test/tag) · แหล่ง Test Scenario ของ Jira (Description / custom field / Acceptance Criteria / Xray-Zephyr / sub-task) · หา fix จาก Development panel + smart commit · รูปแบบข้อความแปะผล (Markdown / wiki markup / AzDO) · ค่าใหม่ใน local.md: {ISSUE_KEY_FORMAT} {TEST_SCENARIO_SOURCE} {FIX_LINK_SOURCE} {RESULT_POST_FORMAT}
 - **1.2** (2026-11-13) — FlaUI (UIA3) เป็นเครื่องมือหลักคุม UI (ห้ามเปลี่ยนวิธีเพราะติดปัญหา, dump UI tree เองก่อนขอ user) · หัวข้อใหม่ "ประสิทธิภาพและเวลา": EnumWindows แทน FindAllChildren, wait/waitgone แทน sleep, คลิกแบบไม่ขยับเมาส์ `tools\noclick.py`, รวมหลายขั้นต่อ process, ข้ามการนำทางซ้ำ, DB check หนักจำกัดช่วง+คู่ขนาน, จดเวลาต่อ test · ค่าใหม่ {FLAUI_HELPERS}
 - **1.3** (2026-11-13) — ลำดับหา locator ใหม่: แผนที่หน้าจอ {SCREEN_MAP} + UI tree ที่ export ไว้ → AutomationId จาก source → dump สดด้วย FlaUI เฉพาะจุดที่ไม่รู้/หาไม่เจอ (dump เฉพาะหน้าต่างนั้น แล้วบันทึกลงแผนที่ทันที) → ขอ user export → พิกัด · ค่าใหม่ {SCREEN_MAP}
+- **2.0** (2026-11-13) — `tools\flaui_kit.py`: FlaUI library ไฟล์เดียว ใช้เป็น Robot library ใน process เดียว (เลิก Run Process ทีละขั้น — #12327 จาก 116 วิ เหลือ 21 วิ) + CLI คำสั่งชุดเดียวกัน · locator `id:/name:/type:` + `#n` · Select Item สำหรับ combo / DevExpress LookUp / CheckedCombo แทนพิกัด · At Point แปลงพิกัดเป็น locator · Close Any Window แทน sleep รอ sync · noclick.activate ดึงหน้าต่างขึ้นหน้าสุดก่อนพิมพ์ (แก้กรณีหน้าต่างอื่นบัง)

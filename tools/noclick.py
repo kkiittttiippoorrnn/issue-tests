@@ -13,6 +13,8 @@ from ctypes import wintypes
 u32 = ctypes.windll.user32
 u32.WindowFromPoint.argtypes = [wintypes.POINT]
 u32.WindowFromPoint.restype = wintypes.HWND
+u32.GetAncestor.restype = wintypes.HWND
+u32.GetForegroundWindow.restype = wintypes.HWND
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON = 0x0200, 0x0201, 0x0202, 0x0001
 REAL = bool(os.environ.get("FLAUI_REAL_MOUSE"))
 
@@ -27,8 +29,23 @@ def _pid(h):
     pid = wintypes.DWORD(); u32.GetWindowThreadProcessId(h, ctypes.byref(pid)); return pid.value
 
 
+def activate(h):
+    """บังคับให้หน้าต่าง (top-level) ขึ้นหน้าสุดและรับคีย์บอร์ด — กด Alt ชั่วคราวเพื่อปลดกฎ SetForegroundWindow ของ Windows"""
+    h = u32.GetAncestor(h, 2) or h  # GA_ROOT
+    if u32.GetForegroundWindow() == h:  # อยู่หน้าสุดแล้ว — ไม่กด Alt (กวนคีย์บอร์ดที่จะพิมพ์ต่อ)
+        return True
+    if u32.IsIconic(h):
+        u32.ShowWindow(h, 9)  # SW_RESTORE
+    u32.keybd_event(0x12, 0, 0, 0)  # Alt down
+    u32.SetForegroundWindow(h)
+    u32.keybd_event(0x12, 0, 2, 0)  # Alt up
+    u32.BringWindowToTop(h)
+    time.sleep(0.2)
+    return u32.GetForegroundWindow() == h
+
+
 def _raise(x, y, pids):
-    """ยกหน้าต่างบนสุดของ pids ที่ครอบจุด (x, y) ขึ้นมาบนสุด (TOPMOST แล้ว NOTOPMOST — ไม่ติดกฎ SetForegroundWindow)"""
+    """ดึงหน้าต่างของ pids ที่ครอบจุด (x, y) ขึ้นหน้าสุด (ตัวล่างก่อน ตัวบนสุด เช่น dialog จบหน้าสุด)"""
     hits = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -39,10 +56,9 @@ def _raise(x, y, pids):
                 hits.append(h)
         return True
     u32.EnumWindows(cb, 0)
-    for h in reversed(hits):  # EnumWindows เรียงบน→ล่าง: ยกตัวล่างก่อน ตัวบนสุด (เช่น dialog) จบบนสุด
-        for flag in (-1, -2):  # HWND_TOPMOST, HWND_NOTOPMOST
-            u32.SetWindowPos(h, flag, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010)  # NOSIZE|NOMOVE|NOACTIVATE
-    time.sleep(0.3)
+    for h in reversed(hits):
+        activate(h)
+    time.sleep(0.2)
 
 
 def _lp(x, y):
